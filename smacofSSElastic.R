@@ -1,6 +1,6 @@
-source("/Users/deleeuw/Desktop/recents/smacofFlat/smacofDataUtilities.R")
-source("/Users/deleeuw/Desktop/recents/smacofFlat/smacofTorgerson.R")
-source("/Users/deleeuw/Desktop/recents/smacofFlat/smacofPlots.R")
+source("smacofDataUtilities.R")
+source("smacofTorgerson.R")
+source("smacofPlots.R")
 
 suppressPackageStartupMessages(library(isotone, quietly = TRUE))
 
