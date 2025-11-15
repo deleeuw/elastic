@@ -1,0 +1,237 @@
+---
+title: Nonmetric Elastic MDS
+author: 
+    - name: Jan de Leeuw
+      orcid: 0000-0003-1420-1797
+      email: jan@deleeuwpdx.net
+      affiliation: 
+        - name: University of California Los Angeles
+          city: Los Angeles
+          state: CA
+          url: www.ucla.edu
+      license: "CC0"
+date: last-modified
+date-format: long
+bibliography: [mypubs.bib, total.bib]
+number-sections: true
+pdf-engine: lualatex
+keep-tex: true
+format:
+   pdf:
+    fontsize: 12pt
+    include-in-header: 
+     - preamble.tex
+    keep-tex: true
+    link-citations: true
+    documentclass: scrartcl
+    number-sections: true
+   html:
+    fontsize: 12pt
+    include-in-header: 
+     - preamble.css
+    keep-md: true
+    number-sections: true
+toc: true
+toc-depth: 3
+editor: source
+papersize: letter
+graphics: true
+link-citations: true
+mainfont: Times New Roman
+abstract: TBD
+---
+
+```{r loadpackages, echo = FALSE}
+suppressPackageStartupMessages(library(knitr, quietly = TRUE))
+suppressPackageStartupMessages(library(tinytex, quietly = TRUE))
+suppressPackageStartupMessages(library(CVXR, quietly = TRUE))
+suppressPackageStartupMessages(library(RSpectra, quietly = TRUE))
+suppressPackageStartupMessages(library(MASS, quietly = TRUE))
+suppressPackageStartupMessages(library(isotone, quietly = TRUE))
+```
+
+**Note:** This is a working manuscript which will be expanded/updated
+frequently. All suggestions for improvement are welcome. All Rmd, tex,
+html, pdf, R, and C files are in the public domain. Attribution will be
+appreciated, but is not required. The files can be found at
+<https://github.com/deleeuw/elastic> 
+
+\sectionbreak
+
+# Introduction
+
+Early in the history of computerized Multidimensional Scaling (MDS), between the seminal contributions of Shepard/Kruskal and Guttman/Lingoes/Roskam, there was the "elastic method" proposed by Victor E. McGee in a series of papers (@mcgee_65, @mcgee_66, @mcgee_67, @mcgee_68). The method has been largely forgotten, but it is worth remembering, because it is different in some important aspects from the more well-known methods.
+
+The least squares loss function in most MDS methods (@borg_groenen_05) can be written as
+\begin{equation}
+\sigma(X,\Delta):=\frac{\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}(\delta_{ij}-d_{ij}(X))^2}{ \mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}\delta_{ij}^2},\label{eq-kruskal}
+\end{equation}
+where $X$ is the *configuration* of $n$ *points* in $p$ *dimensions*, $d_{ij}(X)$ is the *Euclidean distance* between points $i$ and $j$ in configuration $X$, $\delta_{ij}$ is the *dissimilarity* between points $i$ and $j$, and $w_{ij}$ is a *weight*. Weights are non-negative.
+
+In the *metric* version of the MDS method the dissimilarities are observed and fixed, and minimization is over configurations only. The denominator in \eqref{eq-kruskal} is irrelevant for the minimization problem, but it 
+normalizes the problem in the sense that the minimum of stress is between zero and one.
+In the *nonmetric* version minimization is over both configurations and dissimilarities, with the constraint that the dissimilarities are monotonic with an observed set of  dissimilarities.
+
+It is true that in the original Kruskal formulation the denominator is the sum of the squared distances instead. But @deleeuw_U_75a shows that normalizing by using either the sum of squared distances or the sum of squared dissimilarities leads to the same solution (up to a scalar proportionality factor). The smacof program (@deleeuw_mair_A_09c, @mair_groenen_deleeuw_A_22) minimizes the numerator of \eqref{eq-kruskal} over configurations and dissimilarities, with the additional constraint that the sum of squares of the dissimilarities is equal to a constant. Again, this *explicit normalization* gives the same solution, up to proportionality, as the original Kruskal formulation that uses *implicit normalization* by dividing by the sum of squared distances.
+
+In McGee's elastic method the loss is constructed to satisfy two requirements. The first one is
+
+> Psychological judgments which indicated relatively great separation of stimuli should be allowed greater error than judgments indicating close proximity (l.c. p. 182)
+
+And the second requirement is the basic MDS requirement that dimensionality of $X$ must as low as possible, while still providing a good fit.
+
+> A criterion which suggested itself in response to the first requirement was one based on the physical work done on an elastic spring to stretch or compress it from an initial length $\delta_{ij}$ to a final length $d_{ij}$. (l.c. p. 183)
+
+This leads to the loss function 
+\begin{equation}
+\sigma(X,\Delta):=\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}\frac{(\delta_{ij}-d_{ij}(X))^2}{\delta_{ij}^2},\label{eq-mcgee}
+\end{equation}
+which McGee calls the loss in \eqref{eq-mcgee} *work*. We shall just call it *stress* (and *elastic stress* or *McGee stress*), using the more familiar MDS name for loss. We will also continue to use the symbol $\sigma$ for any least squares MDS loss function.
+
+The elastic MDS problem is minimization of stress
+over both $X$ and $\Delta$, where $\Delta$ must be monotone with the given dissimilarities.
+In \eqref{eq-mcgee} the weight $w_{ij}$ is interpreted as the modulus of elasticity of the spring $(i,j)$.
+
+In @mcgee_67 the alternative loss function
+\begin{equation}
+\sigma(X,\Delta):=\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}\frac{(\delta_{ij}-d_{ij}(X))^2}{d_{ij}^2(X)},\label{eq-mcgee2}
+\end{equation}
+is proposed. Minimizing \eqref{eq-mcgee2} seems more complicated, and we will postpone 
+studying algorithms to minimize it. Thus we will work with \eqref{eq-mcgee} in this paper.
+
+In McGee's papers the actual algorithm and its implementation are not described in sufficient detail. Part of the problem is that he is dealing exclusively with the nonmetric case, in which minimization over both $X$ and $\Delta$ is necessary. In the metric case minimization is over $X$ only, and the algorithm is much simpler.
+
+\sectionbreak
+
+# Properties
+
+If we compare \eqref{eq-kruskal} and \eqref{eq-mcgee} we see one important difference. The normalization in \eqref{eq-kruskal} is by the sum of squared dissimilarities, while the normalization in \eqref{eq-mcgee} is term-by-term, by the squared dissimilarities themselves. An alternative way of writing the elastic loss function makes this more clear.
+\begin{equation}
+\sigma(X,\Delta):=\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}\left(1-\frac{d_{ij}(X)}{\delta_{ij}}\right)^2\label{eq-mcgee3}
+\end{equation}
+Thus we see that instead of minimizing the difference of dissimilarities and distances from zero the elastic method minimizes the deviations of their ratios from one.
+
+If $\delta_{ij}$ is multiplied by a positive constant, then so is the optimum configuration $X$ and the $D(X)$. As a consequence, the minimum of elastic stress does not change, i.e. is homogeneous of degree zero in the dissimilarities.
+
+It is clear from \eqref{eq-mcgee3} that the loss function is undefined if one or more of the dissimilarities are zero. If one of the distances is zero, then the corresponding term in the loss function is equal to the corresponding weight, irrespective of what the corresponding dissimilarity is. Thus the minimum of elastic stress is always less than or equal to the sum of the weights, its value at $X=0$.
+
+If $\delta_{ij}$ and $d_{ij}(X)$ are non-zero and close then a first order Taylor series expansion gives
+\begin{equation}
+\log d_{ij}(X)-\log\delta_{ij}\approx\frac{1}{\delta_{ij}}(d_{ij}(X)-\delta_{ij}),\label{eq-ddelta}
+\end{equation}
+from which it follows that
+\begin{equation}
+\sigma(X,\Delta)\approx\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}(\log\delta_{ij}-\log d_{ij}(X))^2.\label{eq-approx}
+\end{equation}
+If the fit is good the elastic stress will be approximately equal to the logarithmic stress from @ramsay_77. Or, to put it differently, minimizing elastic stress can serve as an approximation to minimizing logarithmic stress.
+
+\sectionbreak
+
+# Algorithm
+
+In this paper we will give an iterative algorithm for minimizing loss from \eqref{eq-mcgee} in the metric an non-metric (ordinal) case. A majorization algorithm for the metric case is already available in
+the smacofx package (@rusch_deleeuw_chen_mair_25). Our new non-metric algorithm is in the *alternating least squares* family, which means we alternate minimizing over $X$ for fixed $\Delta$ and over $\Delta$ for fixed 
+$X$.
+
+We will start our iterations with the classical metric solution (@torgerson_58) for $\Delta$. We actually
+scale that solution by minimizing
+\begin{equation}
+\sigma(\lambda):=\sum_{k=1}^m \frac{w_k}{\delta_k^2}(\delta_k-\lambda d_k(X))^2\label{eq-lstress}
+\end{equation}
+over $\lambda$. The minimum is attained at
+\begin{equation}
+\hat\lambda:=\frac{\sum_{k=1}^m \frac{w_k}{\delta_k}d_k(X)}{\sum_{k=1}^m \frac{w_k}{\delta_k^2}d_k^2(X)}.\label{eq-lbd}
+\end{equation}
+
+In iteration $k$ we perform one majorization step to replace $X^{(k)}$ by $X^{(k+1)}$ to improve loss for fixed $\Delta^{(k)}$ and one monotone regression step to replace $\Delta^{(k)}$ by $\Delta^{(k+1)}$ for fixed
+$X^{(k+1)}$. 
+
+To minimize \eqref{eq-mcgee} over $X$ for fixed $\Delta$ we rewrite loss as
+\begin{equation}
+\sigma(X,\Delta)=\mathop{\sum\sum}_{1\leq i<j\leq n}\frac{w_{ij}}{\delta_{ij}^2}(\delta_{ij}-d_{ij}(X))^2.\label{eq-mcgee4}
+\end{equation}
+This can be minimized (or decreased) by using the standard smacof majorization step with the weights $w_{ij}/\delta_{ij}^2$.
+
+To minimize over $\Delta$ for given $X$ we define $\gamma_{ij}:=-\delta_{ij}^{-1}$ abd $c_{ij}(X):=-d_{ij}^{-1}(X)$.
+Rewrite loss as 
+\begin{equation}
+\sigma(X,\Gamma)=\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}d_{ij}^2(X)(\gamma_{ij}-c_{ij}(X))^2,\label{eq-mcgee5}
+\end{equation}
+which we must minimize over increasing $\gamma_{ij}$. This is just monotone regression with  the $c_{ij}(X)$ as the targets and with weights $w_{ij}d_{ij}^2(X)$. After we have found the optimal $\hat\gamma_{ij}$ we transform
+back to $\hat\delta_{ij}=-\hat\gamma_{ij}^{-1}$.
+
+\sectionbreak
+
+# Examples
+
+We start with a simple artificial example to illustrate our iterations. Suppose
+```{r data, echo = FALSE}
+delta <- matrix(0, 6, 6)
+delta[, 1] <- c(0, 1, 2, 3, 4, 5)
+delta[, 2] <- c(0, 0, 6, 7, 8, 9)
+delta[, 3] <- c(0, 0, 0, 10, 11, 12)
+delta[, 4] <- c(0, 0, 0, 0, 13, 14)
+delta[, 5] <- c(0, 0, 0, 0, 0, 15)
+delta <- delta + t(delta)
+print(delta, digits = 2)
+```
+Moreover all weights are equal to one. The Torgerson solution in two dimensions is
+```{r torgerson, echo = FALSE}
+dd <- delta^2
+rd <- apply(dd, 1, mean)
+cc <- -(dd - outer(rd, rd, "+") + mean(dd)) / 2
+ev <- eigen(cc)
+xv <- ev$vectors[, 1:2] %*% diag(sqrt(ev$values[1:2]))
+print(xv)
+```
+and the distances $d(X)$ for this solution are
+```{r disttorg, echo = FALSE}
+delta <- as.dist(delta)
+d <- dist(xv)
+r <- delta / d
+s <- sum((1 - r)^2)
+print(d)
+```
+and stress is `r s`.
+```{r lbdscal, echo = FALSE}
+lbd <- sum(r) / sum(r ^ 2)
+xv <- lbd * xv
+d <- lbd * d
+r <- d / delta
+s <- sum((1 - r)^2)
+```
+If we apply the scaling from ... and ... we find $\hat\lambda$ equal to `r lbd` and a stress value of `r s`.
+
+We now make a majorization step. The configuration becomes
+```{r major, echo = FALSE}
+v <- as.matrix(-1 / delta^2)
+diag(v) <- -rowSums(v)
+vinv <- ginv(v)
+b <- as.matrix(-1 / (delta * d))
+diag(b) <- -rowSums(b)
+xv <- vinv %*% b %*% xv
+print(xv)
+d <- dist(xv)
+r <- d / delta
+s <- sum((1 - r)^2)
+```
+with elastic stress `r s`.
+```{r}
+o <- order(delta)
+print(o)
+print(d)
+y <- 1 / d[o]
+omat <- cbind(2:15,1:14)
+print(omat)
+w <- d[o]^2
+idel <- activeSet(omat, lsSolver, weights = w, y = y)
+dhat <- 1 / idel$x
+plot(delta, dhat)
+r <- d / dhat
+s <- sum((1 - r)^2)
+print(s)
+```
+\sectionbreak
+
+# References
+
