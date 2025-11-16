@@ -14,7 +14,7 @@ delta <- as.dist(delta + t(delta))
 
 smallData <- makeMDSData(delta, weights = NULL)
 
-smacofSSElastic <- function(theData,
+smacofSSElasticR <- function(theData,
                       ndim = 2,
                       ordinal = TRUE,
                       ties = "primary",
