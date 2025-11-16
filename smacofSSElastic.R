@@ -17,6 +17,7 @@ smallData <- makeMDSData(delta, weights = NULL)
 smacofSSElastic <- function(theData,
                       ndim = 2,
                       ordinal = TRUE,
+                      ties = "primary",
                       itmax = 1000,
                       eps = 1e-6,
                       verbose = TRUE) {
@@ -59,7 +60,7 @@ smacofSSElastic <- function(theData,
     rmid <- dmid / dhat
     smid <- sum(wght * (1 - rmid)^2)
     if (ordinal) {
-      dhat <- -1 / gpava(theData$delta, -1 / dmid, weights = wght * dmid^2)$x
+      dhat <- -1 / gpava(theData$delta, -1 / dmid, weights = wght * dmid^2, ties = ties)$x
       rnew <- dmid / dhat
       snew <- sum(wght * (1 - rnew)^2)
     } else {
