@@ -1,14 +1,10 @@
 
-SSRC = smacofIsotone.c smacofMPInverseV.c smacofSort.c smacofSSEngine.c smacofSSMajorize.c smacofSSMonotone.c
 
-ESRC = smacofIsotone.c smacofMPInverseV.c smacofSort.c smacofSSElasticEngine.c smacofSSMajorize.c smacofSSMonotone.c
+ESRC = smacofIsotone.c smacofMPInverseV.c smacofSort.c smacofSSElasticEngine.c smacofSSElasticMajorize.c smacofSSElasticMonotone.c
 
-%.o: %.c smacofSS.h
+%.o: %.c smacofSSElastic.h
 	clang -c $@
-
-sshlib: smacofSS.h $(SSRC)
-	R CMD SHLIB -o smacofSS.so $(SSRC)
-
+	
 eshlib: smacofSSElastic.h $(ESRC)
 	R CMD SHLIB -o smacofSSElastic.so $(ESRC)
 

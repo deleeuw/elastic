@@ -16,24 +16,33 @@ smallData <- makeMDSData(delta, weights = NULL)
 
 smacofSSElasticR <- function(theData,
                       ndim = 2,
-                      ordinal = TRUE,
-                      ties = "primary",
+                      xinit = NULL,
+                      ties = 1,
                       itmax = 1000,
                       eps = 1e-6,
-                      verbose = TRUE) {
+                      verbose = TRUE,
+                      ordinal = FALSE,
+                      weighted = FALSE) {
+  
+  ties <- switch(ties, "primary", "secondary", "tertiary")
   ndat <- theData$ndat
   nobj <- theData$nobj
   iind <- theData$iind
   jind <- theData$jind
-  xold <- smacofTorgerson(theData, ndim)$conf
+  dhat <- theData$delta
+  wght <- theData$weights
+  if (!weighted) {
+    wght <- rep(1, ndat)
+  }
+  if (is.null(xinit)) {
+    xinit <- smacofTorgerson(theData, ndim)$conf
+  }
+  xold <- xinit
   dold <- rep(0, ndat)
   for (k in 1:ndat) {
     dold[k] <- sqrt(sum((xold[iind[k], ] - xold[jind[k], ])^2))
   }
-  dhat <- theData$delta
   rold <- dold / dhat
-  wght <- theData$weights
-  sini <- sum(wght * (1 - rold)^2)
   labd <- sum(wght * rold) / sum(wght * rold^2)
   xold <- labd * xold
   dold <- labd * dold
