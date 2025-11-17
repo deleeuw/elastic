@@ -231,6 +231,19 @@ r <- d / dhat
 s <- sum((1 - r)^2)
 print(s)
 ```
+
+Unit: milliseconds
+                                                          expr        min         lq       mean     median         uq
+ smacofSSElasticR(morseData, ordinal = FALSE, verbose = FALSE) 106.137110 108.788006 114.907009 109.952508 111.618687
+ smacofSSElasticC(morseData, ordinal = FALSE, verbose = FALSE)   6.183292   6.481526   6.539732   6.542575   6.614325
+  smacofSSElasticR(morseData, ordinal = TRUE, verbose = FALSE) 709.953376 720.502860 738.153851 728.890579 751.493530
+  smacofSSElasticC(morseData, ordinal = TRUE, verbose = FALSE)   6.684804   6.952637   7.041597   7.018318   7.134574
+        max neval
+ 189.327053   100
+   6.714078   100
+ 883.220729   100
+   9.207616   100
+   
 \sectionbreak
 
 # References
