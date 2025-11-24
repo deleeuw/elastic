@@ -64,7 +64,7 @@ smacofSSElasticC <- function(theData,
     jind = as.integer(jind - 1),
     blks = as.integer(blks),
     wght = as.double(wght),
-    dold = as.double(dold),
+    edis = as.double(dold),
     dhat = as.double(dhat),
     xold = as.double(xold),
     xnew = as.double(xnew)

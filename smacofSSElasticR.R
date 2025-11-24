@@ -4,16 +4,6 @@ source("smacofPlots.R")
 
 suppressPackageStartupMessages(library(isotone, quietly = TRUE))
 
-delta <- matrix(0, 6, 6)
-delta[, 1] <- c(0, 1, 2, 3, 4, 5)
-delta[, 2] <- c(0, 0, 6, 7, 8, 9)
-delta[, 3] <- c(0, 0, 0, 10, 11, 12)
-delta[, 4] <- c(0, 0, 0, 0, 13, 14)
-delta[, 5] <- c(0, 0, 0, 0, 0, 15)
-delta <- as.dist(delta + t(delta))
-
-smallData <- makeMDSData(delta, weights = NULL)
-
 smacofSSElasticR <- function(theData,
                       ndim = 2,
                       xinit = NULL,

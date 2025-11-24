@@ -1,5 +1,5 @@
 ---
-title: Nonmetric Elastic MDS
+title: Metric/Nonmetric Elastic MDS
 author: 
     - name: Jan de Leeuw
       orcid: 0000-0003-1420-1797
@@ -38,7 +38,11 @@ papersize: letter
 graphics: true
 link-citations: true
 mainfont: Times New Roman
-abstract: TBD
+abstract: We present R and C implementations for metric (ratio)
+  and non-metric (ordinal) versions of Elastic MDS, the multidimensional 
+  scaling technique proposed by @mcgee_66. The R and C versions are
+  compared for speed, with the C version anywhere from 15 to 100 
+  times as fast as the R version.
 ---
 
 ```{r loadpackages, echo = FALSE}
@@ -48,6 +52,11 @@ suppressPackageStartupMessages(library(CVXR, quietly = TRUE))
 suppressPackageStartupMessages(library(RSpectra, quietly = TRUE))
 suppressPackageStartupMessages(library(MASS, quietly = TRUE))
 suppressPackageStartupMessages(library(isotone, quietly = TRUE))
+suppressPackageStartupMessages(library(microbenchmark, quietly = TRUE))
+```
+``` {r loadfiles, echo = FALSE}
+source("smacofSSElasticC.R")
+source("smacofSSElasticR.R")
 ```
 
 **Note:** This is a working manuscript which will be expanded/updated
@@ -56,7 +65,7 @@ html, pdf, R, and C files are in the public domain. Attribution will be
 appreciated, but is not required. The files can be found at
 <https://github.com/deleeuw/elastic> 
 
-\sectionbreak
+
 
 # Introduction
 
@@ -86,7 +95,7 @@ This leads to the loss function
 \begin{equation}
 \sigma(X,\Delta):=\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}\frac{(\delta_{ij}-d_{ij}(X))^2}{\delta_{ij}^2},\label{eq-mcgee}
 \end{equation}
-which McGee calls the loss in \eqref{eq-mcgee} *work*. We shall just call it *stress* (and *elastic stress* or *McGee stress*), using the more familiar MDS name for loss. We will also continue to use the symbol $\sigma$ for any least squares MDS loss function.
+which McGee calls *work*. We shall just call it *stress* (and *elastic stress* or *McGee stress*), using the more familiar MDS name for loss. We will also continue to use the symbol $\sigma$ for any least squares MDS loss function.
 
 The elastic MDS problem is minimization of stress
 over both $X$ and $\Delta$, where $\Delta$ must be monotone with the given dissimilarities.
@@ -101,7 +110,7 @@ studying algorithms to minimize it. Thus we will work with \eqref{eq-mcgee} in t
 
 In McGee's papers the actual algorithm and its implementation are not described in sufficient detail. Part of the problem is that he is dealing exclusively with the nonmetric case, in which minimization over both $X$ and $\Delta$ is necessary. In the metric case minimization is over $X$ only, and the algorithm is much simpler.
 
-\sectionbreak
+
 
 # Properties
 
@@ -125,12 +134,12 @@ from which it follows that
 \end{equation}
 If the fit is good the elastic stress will be approximately equal to the logarithmic stress from @ramsay_77. Or, to put it differently, minimizing elastic stress can serve as an approximation to minimizing logarithmic stress.
 
-\sectionbreak
+
 
 # Algorithm
 
-In this paper we will give an iterative algorithm for minimizing loss from \eqref{eq-mcgee} in the metric an non-metric (ordinal) case. A majorization algorithm for the metric case is already available in
-the smacofx package (@rusch_deleeuw_chen_mair_25). Our new non-metric algorithm is in the *alternating least squares* family, which means we alternate minimizing over $X$ for fixed $\Delta$ and over $\Delta$ for fixed 
+In this paper we will give an iterative algorithm for minimizing loss from \eqref{eq-mcgee} in the metric and non-metric (ordinal) case. A majorization algorithm for the metric case is already available in
+the smacofx package (@rusch_deleeuw_chen_mair_25, @rusch_deleeuw_mair_hornik_25). Our new non-metric algorithm is in the *alternating least squares* family, which means we alternate minimizing over $X$ for fixed $\Delta$ and over $\Delta$ for fixed 
 $X$.
 
 We will start our iterations with the classical metric solution (@torgerson_58) for $\Delta$. We actually
@@ -160,91 +169,77 @@ Rewrite loss as
 which we must minimize over increasing $\gamma_{ij}$. This is just monotone regression with  the $c_{ij}(X)$ as the targets and with weights $w_{ij}d_{ij}^2(X)$. After we have found the optimal $\hat\gamma_{ij}$ we transform
 back to $\hat\delta_{ij}=-\hat\gamma_{ij}^{-1}$.
 
-\sectionbreak
+
+
+# Software
+
+The github repository contains R and C versions of the smacofSSElastic program. 
+Both smacofSSElasticC() and smacofSSElasticR() have the same default values of the 
+parameters and the two programs are structured the same way. We iterate a 
+maximum of 1000 iterations until the change in stress from one iteration 
+to the next is less than `r 1e-6`. A single majorization update is alternated
+with a single monotone regression.
+
+smacofSSElasticC() has a driver in R that sets up the MDS data structure (@deleeuw_E_25b). Both
+program use a number of R utilities for data manipulation and the initial configuration. One important difference is that the R version uses 
+gpava() for monotone regression (@deleeuw_hornik_mair_A_09), which is written in R, while the R version uses the C routine monotone() from @busing_22.
+
+
 
 # Examples
 
-We start with a simple artificial example to illustrate our iterations. Suppose
-```{r data, echo = FALSE}
-delta <- matrix(0, 6, 6)
-delta[, 1] <- c(0, 1, 2, 3, 4, 5)
-delta[, 2] <- c(0, 0, 6, 7, 8, 9)
-delta[, 3] <- c(0, 0, 0, 10, 11, 12)
-delta[, 4] <- c(0, 0, 0, 0, 13, 14)
-delta[, 5] <- c(0, 0, 0, 0, 0, 15)
-delta <- delta + t(delta)
-print(delta, digits = 2)
-```
-Moreover all weights are equal to one. The Torgerson solution in two dimensions is
-```{r torgerson, echo = FALSE}
-dd <- delta^2
-rd <- apply(dd, 1, mean)
-cc <- -(dd - outer(rd, rd, "+") + mean(dd)) / 2
-ev <- eigen(cc)
-xv <- ev$vectors[, 1:2] %*% diag(sqrt(ev$values[1:2]))
-print(xv)
-```
-and the distances $d(X)$ for this solution are
-```{r disttorg, echo = FALSE}
-delta <- as.dist(delta)
-d <- dist(xv)
-r <- delta / d
-s <- sum((1 - r)^2)
-print(d)
-```
-and stress is `r s`.
-```{r lbdscal, echo = FALSE}
-lbd <- sum(r) / sum(r ^ 2)
-xv <- lbd * xv
-d <- lbd * d
-r <- d / delta
-s <- sum((1 - r)^2)
-```
-If we apply the scaling from ... and ... we find $\hat\lambda$ equal to `r lbd` and a stress value of `r s`.
+We analyze two classical MDS examples: the color data of @ekman_54 and the Morse code data of @rothkopf_57.
+We are only interested in this paper in performance of the programs, not in the substantive interpretation of the results or in the comparison of elastic scaling and regular smacof.
 
-We now make a majorization step. The configuration becomes
-```{r major, echo = FALSE}
-v <- as.matrix(-1 / delta^2)
-diag(v) <- -rowSums(v)
-vinv <- ginv(v)
-b <- as.matrix(-1 / (delta * d))
-diag(b) <- -rowSums(b)
-xv <- vinv %*% b %*% xv
-print(xv)
-d <- dist(xv)
-r <- d / delta
-s <- sum((1 - r)^2)
+```{r ekman, echo = FALSE}
+source("ekmanData.R")
+hen <- smacofSSElasticC(ekmanData, ordinal = FALSE, verbose = FALSE)
+heo <- smacofSSElasticC(ekmanData, ordinal = TRUE, verbose = FALSE)
 ```
-with elastic stress `r s`.
-```{r}
-o <- order(delta)
-print(o)
-print(d)
-y <- 1 / d[o]
-omat <- cbind(2:15,1:14)
-print(omat)
-w <- d[o]^2
-idel <- activeSet(omat, lsSolver, weights = w, y = y)
-dhat <- 1 / idel$x
-plot(delta, dhat)
-r <- d / dhat
-s <- sum((1 - r)^2)
-print(s)
-```
+Numerical elastic scaling takes `r hen$niter` iterations to arrive at stress `r hen$stress`. For ordinal
+we need `r heo$niter` iterations for stress `r heo$stress`. Since the ordinal fit is very good the
+log-stress of \eqref{eq-approx} should be close to the elastic stress. It is `r sum((log(heo$dhat) - log(heo$confdist))^2)`.
 
-Unit: milliseconds
-                                                          expr        min         lq       mean     median         uq
- smacofSSElasticR(morseData, ordinal = FALSE, verbose = FALSE) 106.137110 108.788006 114.907009 109.952508 111.618687
- smacofSSElasticC(morseData, ordinal = FALSE, verbose = FALSE)   6.183292   6.481526   6.539732   6.542575   6.614325
-  smacofSSElasticR(morseData, ordinal = TRUE, verbose = FALSE) 709.953376 720.502860 738.153851 728.890579 751.493530
-  smacofSSElasticC(morseData, ordinal = TRUE, verbose = FALSE)   6.684804   6.952637   7.041597   7.018318   7.134574
-        max neval
- 189.327053   100
-   6.714078   100
- 883.220729   100
-   9.207616   100
-   
-\sectionbreak
+The results of a comparison of the R and C implementations with microbenchmark (@mersmann_24) yields the
+times in microseconds in following table.
+```{r microekman, echo = FALSE}
+a<-matrix(c(40.13, 1.44, 163.52, 4.06, 41.66, 1.53, 168.14, 4.39, 
+            44.38, 1.60, 172.10, 4.57, 43.84, 1.60, 169.50, 4.46,
+            45.11, 1.64, 172.28, 4.71, 109.41, 1.81, 242.27, 7.37),
+          4, 6)
+colnames(a) <- c("min", "lq", "mean", "median", "uq", "max")
+row.names(a) <- c("R/Numerical", "C/Numerical", "R/Ordinal", "C/Ordinal")
+a
+```
+Using median times we see that that C version is about 40 times as fast as the R version.
+```{r morse, echo = FALSE}
+source("morseData.R")
+hmn <- smacofSSElasticC(morseData, ordinal = FALSE, verbose = FALSE)
+hmo <- smacofSSElasticC(morseData, ordinal = TRUE, verbose = FALSE)
+```
+For the Morse code data numerical elastic scaling takes `r hmn$niter` iterations to arrive at stress `r hmn$stress`, for ordinal we need `r hmo$niter` iterations for stress `r hmo$stress`. Because the fit is much worse than
+in the Ekman case we do not expect log-stress to be close to elastic stress. For the ordinal case final log-stress is `r sum((log(hmo$dhat) - log(hmo$confdist))^2)`.
+
+```{r micromorse, echo = FALSE}
+a<-matrix(c(80.71, 6.38, 711.81, 7.25,
+            85.50, 6.62, 744.80, 7.60,
+            92.21, 6.77, 767.76, 7.82, 
+            87.61, 6.71, 764.32, 7.74,
+            91.38, 6.80, 784.45, 7.83,
+            162.41, 10.96, 862.41, 11.35),
+          4, 6)
+colnames(a) <- c("min", "lq", "mean", "median", "uq", "max")
+row.names(a) <- c("R/Numerical", "C/Numerical", "R/Ordinal", "C/Ordinal")
+a
+```
+In the numerical case the C version is about 15 times as fast, in the ordinal case
+about 100 times. The huge difference in the ordinal case is likely to be due in large part to the different monotone regression routiones used by the R and C programs.
+
+Of course these microbenchmark results depend on the default
+parameters of the programs (same in R and C), on the speed of my computer
+(Mac Mini with Apple M4 Pro, 64 GB of Ram, Tahoe 26.2), and on my programming
+habits (same in R and C).
+
 
 # References
 
