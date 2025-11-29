@@ -9,5 +9,8 @@ eshlib: smacofSSElastic.h $(ESRC)
 	R CMD SHLIB -o smacofSSElastic.so $(ESRC)
 
 clean:
+	rm -f *.o
+
+pristine:
 	rm -f *.o *.so
 

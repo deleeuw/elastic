@@ -85,6 +85,6 @@ smacofSSElasticC <- function(theData,
     weighted = weighted,
     ordinal = ordinal
   )
-  class(result) <- c("smacofSSResult", "smacofSSUOResult")
+  class(result) <- c("smacofSSResult", "smacofSSElasticResult")
   return(result)
 }
