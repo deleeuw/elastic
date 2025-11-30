@@ -38,9 +38,9 @@ papersize: letter
 graphics: true
 link-citations: true
 mainfont: Times New Roman
-abstract: We present R and C implementations for metric (ratio)
+abstract: We present R and C implementations for metric 
   and non-metric (ordinal) versions of Elastic MDS, the multidimensional 
-  scaling technique proposed by @mcgee_66. The R and C versions are
+  scaling technique proposed by Victor E. McGee in 1966. The R and C versions are
   compared for speed, with the C version anywhere from 15 to 100 
   times as fast as the R version.
 ---
@@ -69,7 +69,7 @@ appreciated, but is not required. The files can be found at
 
 # Introduction
 
-Early in the history of computerized Multidimensional Scaling (MDS), between the seminal contributions of Shepard/Kruskal and Guttman/Lingoes/Roskam, there was the "elastic method" proposed by Victor E. McGee in a series of papers (@mcgee_65, @mcgee_66, @mcgee_67, @mcgee_68). The method has been largely forgotten, but it is worth remembering, because it is different in some important aspects from the more well-known methods.
+Early in the history of computerized Multidimensional Scaling (MDS), between the seminal contributions of Shepard/Kruskal and Guttman/Lingoes/Roskam, there was the "elastic method" proposed by Victor E. McGee in a series of papers (@mcgee_65, @mcgee_66, @mcgee_67, @mcgee_68). The method has been largely forgotten, but it is worth preserving, because it is different in some important aspects from the more well-known methods.
 
 The least squares loss function in most MDS methods (@borg_groenen_05) can be written as
 \begin{equation}
@@ -134,15 +134,13 @@ from which it follows that
 \end{equation}
 If the fit is good the elastic stress will be approximately equal to the logarithmic stress from @ramsay_77. Or, to put it differently, minimizing elastic stress can serve as an approximation to minimizing logarithmic stress.
 
-
-
 # Algorithm
 
 In this paper we will give an iterative algorithm for minimizing loss from \eqref{eq-mcgee} in the metric and non-metric (ordinal) case. A majorization algorithm for the metric case is already available in
 the smacofx package (@rusch_deleeuw_chen_mair_25, @rusch_deleeuw_mair_hornik_25). Our new non-metric algorithm is in the *alternating least squares* family, which means we alternate minimizing over $X$ for fixed $\Delta$ and over $\Delta$ for fixed 
 $X$.
 
-We will start our iterations with the classical metric solution (@torgerson_58) for $\Delta$. We actually
+We will start our iterations with the classical metric MDS solution (@torgerson_58) for $\Delta$. We actually
 scale that solution by minimizing
 \begin{equation}
 \sigma(\lambda):=\sum_{k=1}^m \frac{w_k}{\delta_k^2}(\delta_k-\lambda d_k(X))^2\label{eq-lstress}
@@ -182,14 +180,13 @@ with a single monotone regression.
 
 smacofSSElasticC() has a driver in R that sets up the MDS data structure (@deleeuw_E_25b). Both
 program use a number of R utilities for data manipulation and the initial configuration. One important difference is that the R version uses 
-gpava() for monotone regression (@deleeuw_hornik_mair_A_09), which is written in R, while the R version uses the C routine monotone() from @busing_22.
-
-
+gpava(), which is written in R, for monotone regression (@deleeuw_hornik_mair_A_09), while the R version uses the C routine monotone() from @busing_22.
 
 # Examples
 
-We analyze two classical MDS examples: the color data of @ekman_54 and the Morse code data of @rothkopf_57.
-We are only interested in this paper in performance of the programs, not in the substantive interpretation of the results or in the comparison of elastic scaling and regular smacof.
+We analyze two classical MDS examples: the color data of @ekman_54 and the Morse code data of @rothkopf_57. We are only interested in this paper in the properties of the programs, not in the substantive interpretation of the results.
+
+## Results
 
 ```{r ekman, echo = FALSE}
 source("ekmanData.R")
@@ -199,6 +196,17 @@ heo <- smacofSSElasticC(ekmanData, ordinal = TRUE, verbose = FALSE)
 Numerical elastic scaling takes `r hen$niter` iterations to arrive at stress `r hen$stress`. For ordinal
 we need `r heo$niter` iterations for stress `r heo$stress`. Since the ordinal fit is very good the
 log-stress of \eqref{eq-approx} should be close to the elastic stress. It is `r sum((log(heo$dhat) - log(heo$confdist))^2)`.
+
+```{r morse, echo = FALSE}
+source("morseData.R")
+hmn <- smacofSSElasticC(morseData, ordinal = FALSE, verbose = FALSE)
+hmo <- smacofSSElasticC(morseData, ordinal = TRUE, verbose = FALSE)
+```
+
+For the Morse code data numerical elastic scaling takes `r hmn$niter` iterations to arrive at stress `r hmn$stress`, for ordinal we need `r hmo$niter` iterations for stress `r hmo$stress`. Because the fit is much worse than
+in the Ekman case we do not expect log-stress to be close to elastic stress. For the ordinal case final log-stress is `r sum((log(hmo$dhat) - log(hmo$confdist))^2)`.
+
+## Timing
 
 The results of a comparison of the R and C implementations with microbenchmark (@mersmann_24) yields the
 times in microseconds in following table.
@@ -212,14 +220,9 @@ row.names(a) <- c("R/Numerical", "C/Numerical", "R/Ordinal", "C/Ordinal")
 a
 ```
 Using median times we see that that C version is about 40 times as fast as the R version.
-```{r morse, echo = FALSE}
-source("morseData.R")
-hmn <- smacofSSElasticC(morseData, ordinal = FALSE, verbose = FALSE)
-hmo <- smacofSSElasticC(morseData, ordinal = TRUE, verbose = FALSE)
-```
-For the Morse code data numerical elastic scaling takes `r hmn$niter` iterations to arrive at stress `r hmn$stress`, for ordinal we need `r hmo$niter` iterations for stress `r hmo$stress`. Because the fit is much worse than
-in the Ekman case we do not expect log-stress to be close to elastic stress. For the ordinal case final log-stress is `r sum((log(hmo$dhat) - log(hmo$confdist))^2)`.
 
+
+Next, the timings for the Morse data.
 ```{r micromorse, echo = FALSE}
 a<-matrix(c(80.71, 6.38, 711.81, 7.25,
             85.50, 6.62, 744.80, 7.60,
@@ -233,13 +236,49 @@ row.names(a) <- c("R/Numerical", "C/Numerical", "R/Ordinal", "C/Ordinal")
 a
 ```
 In the numerical case the C version is about 15 times as fast, in the ordinal case
-about 100 times. The huge difference in the ordinal case is likely to be due in large part to the different monotone regression routiones used by the R and C programs.
+about 100 times. The huge difference in the ordinal case is likely due in large part to the different monotone regression routines used by the R and C programs.
 
 Of course these microbenchmark results depend on the default
 parameters of the programs (same in R and C), on the speed of my computer
-(Mac Mini with Apple M4 Pro, 64 GB of Ram, Tahoe 26.2), and on my programming
-habits (same in R and C).
+(Mac Mini with Apple M4 Pro, 64 GB of RAM, Tahoe 26.2, Apple clang 17.0.0), and on my programming habits (same in R and C).
 
+## Plots
+
+We use Shepard plots (@deleeuw_mair_C_15) to illustrate the difference between
+the solutions for classical Kruskal stress and elastic stress. Both for
+Ekman and Morse we give the two solutions in the ordinal case, with the primary
+approach to ties.
+
+```{r compplotE, fig.align = "center", fig.width = 8, fig.height = 8, echo = FALSE}
+par(pty="s")
+setwd("/Users/deleeuw/Desktop/recents/elastic")
+source("smacofSSElasticC.R")
+source("../smacofFlat/smacofSSdata/ekmanData.R")
+h1 <- smacofSSElasticC(ekmanData, ordinal = TRUE, verbose = FALSE)
+smacofShepardPlot(h1, main = "Shepard Plot Ekman, Elastic")
+dyn.unload("smacofSSElastic.so")
+setwd("/Users/deleeuw/Desktop/recents/smacofFlat")
+source("smacofSS.R")
+h2 <- smacofSS(ekmanData, ordinal = TRUE, verbose = FALSE)
+smacofShepardPlot(h2, main = "Shepard Plot Ekman, Kruskal")
+```
+```{r compplotM, fig.align = "center", fig.width = 8, fig.height = 8, echo = FALSE}
+par(pty="s")
+setwd("/Users/deleeuw/Desktop/recents/elastic")
+source("smacofSSElasticC.R")
+source("../smacofFlat/smacofSSdata/morseData.R")
+h1 <- smacofSSElasticC(morseData, ordinal = TRUE, verbose = FALSE)
+smacofShepardPlot(h1, main = "Shepard Plot Morse, Elastic")
+dyn.unload("smacofSSElastic.so")
+setwd("/Users/deleeuw/Desktop/recents/smacofFlat")
+source("smacofSS.R")
+h2 <- smacofSS(morseData, ordinal = TRUE, verbose = FALSE)
+smacofShepardPlot(h2, main = "Shepard Plot Morse, Kruskal")
+```
+
+The examples show that the solutions are pretty similar, but definitely elastic MDS
+gives a better fit for the smaller dissimilarities and deemphasizes the larger ones.
+In that sense elastic MDS is more "robust".
 
 # References
 
