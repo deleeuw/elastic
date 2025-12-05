@@ -182,7 +182,7 @@ smacofSSElasticC() has a driver in R that sets up the MDS data structure (@delee
 program use a number of R utilities for data manipulation and the initial configuration. One important difference is that the R version uses 
 gpava(), which is written in R, for monotone regression (@deleeuw_hornik_mair_A_09), while the R version uses the C routine monotone() from @busing_22.
 
-# Examples
+# Ecxamples
 
 We analyze two classical MDS examples: the color data of @ekman_54 and the Morse code data of @rothkopf_57. We are only interested in this paper in the properties of the programs, not in the substantive interpretation of the results.
 
