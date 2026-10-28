@@ -1,9 +1,7 @@
-.Rproj.user
+.Rproj.user/
 .Rhistory
 .RData
 .Ruserdata
-*.tex
-*.pdf
 *.aux
 *.md
 *.Rproj
@@ -11,8 +9,7 @@
 *.so
 *.log
 *.toc
-*cache/
 !README.md
-*._files
-._libs
+*_files/
+*_cache/
 /.quarto/

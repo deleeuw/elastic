@@ -1,15 +1,15 @@
 ---
 title: Metric/Nonmetric Elastic MDS
-author: 
-    - name: Jan de Leeuw
-      orcid: 0000-0003-1420-1797
-      email: jan@deleeuwpdx.net
-      affiliation: 
-        - name: University of California Los Angeles
-          city: Los Angeles
-          state: CA
-          url: www.ucla.edu
-      license: "CC0"
+author:
+  - name: Jan de Leeuw
+    orcid: 0000-0003-1420-1797
+    email: jan@deleeuwpdx.net
+    affiliation:
+      - name: University of California Los Angeles
+        city: Los Angeles
+        state: CA
+        url: www.ucla.edu
+    license: "CC0"
 date: last-modified
 date-format: long
 bibliography: [mypubs.bib, total.bib]
@@ -17,18 +17,18 @@ number-sections: true
 pdf-engine: lualatex
 keep-tex: true
 format:
-   pdf:
+  pdf:
     fontsize: 12pt
-    include-in-header: 
-     - preamble.tex
+    include-in-header:
+      - preamble.tex
     keep-tex: true
     link-citations: true
     documentclass: scrartcl
     number-sections: true
-   html:
+  html:
     fontsize: 12pt
-    include-in-header: 
-     - preamble.css
+    include-in-header:
+      - preamble.css
     keep-md: true
     number-sections: true
 toc: true
@@ -38,14 +38,16 @@ papersize: letter
 graphics: true
 link-citations: true
 mainfont: Times New Roman
-abstract: We present R and C implementations for metric 
-  and non-metric (ordinal) versions of Elastic MDS, the multidimensional 
-  scaling technique proposed by Victor E. McGee in 1966. The R and C versions are
-  compared for speed, with the C version anywhere from 15 to 100 
+abstract: We present R and C implementations of the majorization method for metric and non-metric (ordinal)    versions of Elastic MDS, the multidimensional
+  scaling technique proposed by Victor E. McGee in 1966. The non-metric version requires a special purpose     monotone regression technique. The R and C versions are
+  compared for speed, with the C version anywhere from 15 to 100
   times as fast as the R version.
 ---
 
-```{r loadpackages, echo = FALSE}
+```{r}
+#| label: loadpackages
+#| echo: false
+
 suppressPackageStartupMessages(library(knitr, quietly = TRUE))
 suppressPackageStartupMessages(library(tinytex, quietly = TRUE))
 suppressPackageStartupMessages(library(CVXR, quietly = TRUE))
@@ -54,173 +56,257 @@ suppressPackageStartupMessages(library(MASS, quietly = TRUE))
 suppressPackageStartupMessages(library(isotone, quietly = TRUE))
 suppressPackageStartupMessages(library(microbenchmark, quietly = TRUE))
 ```
-``` {r loadfiles, echo = FALSE}
+```{r}
+#| label: loadfiles
+#| echo: false
+
 source("smacofSSElasticC.R")
 source("smacofSSElasticR.R")
 ```
 
 **Note:** This is a working manuscript which will be expanded/updated
-frequently. All suggestions for improvement are welcome. All Rmd, tex,
-html, pdf, R, and C files are in the public domain. Attribution will be
-appreciated, but is not required. The files can be found at
-<https://github.com/deleeuw/elastic> 
-
-
+frequently. All suggestions for improvement are welcome. All Rmd, tex, html,
+pdf, R, and C files are in the public domain. Attribution will be appreciated,
+but is not required. The files can be found at
+<https://github.com/deleeuw/elastic>
 
 # Introduction
 
-Early in the history of computerized Multidimensional Scaling (MDS), between the seminal contributions of Shepard/Kruskal and Guttman/Lingoes/Roskam, there was the "elastic method" proposed by Victor E. McGee in a series of papers (@mcgee_65, @mcgee_66, @mcgee_67, @mcgee_68). The method has been largely forgotten, but it is worth preserving, because it is different in some important aspects from the more well-known methods.
+Early in the history of computerized Multidimensional Scaling (MDS), between the
+seminal contributions of Shepard/Kruskal and Guttman/Lingoes/Roskam, there was
+the "elastic method" proposed by Victor E. McGee in a series of papers
+(@mcgee_65, @mcgee_66, @mcgee_67, @mcgee_68). The method has been largely
+forgotten, but it is worth preserving, because it is different in some important
+aspects from the more well-known methods.
 
-The least squares loss function in most MDS methods (@borg_groenen_05) can be written as
+The least squares loss function in most MDS methods (@borg_groenen_05) can be
+written as
 \begin{equation}
-\sigma(X,\Delta):=\frac{\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}(\delta_{ij}-d_{ij}(X))^2}{ \mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}\delta_{ij}^2},\label{eq-kruskal}
+  \sigma(X,\Delta) := \frac{\mathop{\sum\sum}_{1 \leq i<j \leq n}w_{ij}(\delta_{ij} - d_{ij}(X))^2}{\mathop{\sum\sum}_{1 \leq i<j \leq n}w_{ij}\delta_{ij}^2},\label{eq-kruskal}
 \end{equation}
-where $X$ is the *configuration* of $n$ *points* in $p$ *dimensions*, $d_{ij}(X)$ is the *Euclidean distance* between points $i$ and $j$ in configuration $X$, $\delta_{ij}$ is the *dissimilarity* between points $i$ and $j$, and $w_{ij}$ is a *weight*. Weights are non-negative.
+where $X$ is the *configuration* of $n$ *points* in $p$ *dimensions*,
+$d_{ij}(X)$ is the *Euclidean distance* between points $i$ and $j$ in
+configuration $X$, $\delta_{ij}$ is the *dissimilarity* between points $i$ and
+$j$, and $w_{ij}$ is a *weight*. Weights are non-negative.
 
-In the *metric* version of the MDS method the dissimilarities are observed and fixed, and minimization is over configurations only. The denominator in \eqref{eq-kruskal} is irrelevant for the minimization problem, but it 
-normalizes the problem in the sense that the minimum of stress is between zero and one.
-In the *nonmetric* version minimization is over both configurations and dissimilarities, with the constraint that the dissimilarities are monotonic with an observed set of  dissimilarities.
+In the *metric* version of the MDS method the dissimilarities are observed and
+fixed, and minimization is over configurations only. The denominator in
+\eqref{eq-kruskal} is irrelevant for the minimization problem, but it normalizes
+the problem in the sense that the minimum of stress is between zero and one. In
+the *nonmetric* version minimization is over both configurations and
+dissimilarities, with the constraint that the dissimilarities are monotonic with
+an observed set of dissimilarities.
 
-It is true that in the original Kruskal formulation the denominator is the sum of the squared distances instead. But @deleeuw_U_75a shows that normalizing by using either the sum of squared distances or the sum of squared dissimilarities leads to the same solution (up to a scalar proportionality factor). The smacof program (@deleeuw_mair_A_09c, @mair_groenen_deleeuw_A_22) minimizes the numerator of \eqref{eq-kruskal} over configurations and dissimilarities, with the additional constraint that the sum of squares of the dissimilarities is equal to a constant. Again, this *explicit normalization* gives the same solution, up to proportionality, as the original Kruskal formulation that uses *implicit normalization* by dividing by the sum of squared distances.
+It is true that in the original Kruskal formulation the denominator is the sum
+of the squared distances instead. But @deleeuw_U_75a shows that normalizing by
+using either the sum of squared distances or the sum of squared dissimilarities
+leads to the same solution (up to a scalar proportionality factor). The smacof
+program (@deleeuw_mair_A_09c, @mair_groenen_deleeuw_A_22) minimizes the
+numerator of \eqref{eq-kruskal} over configurations and dissimilarities, with
+the additional constraint that the sum of squares of the dissimilarities is
+equal to a constant. Again, this *explicit normalization* gives the same
+solution, up to proportionality, as the original Kruskal formulation that uses
+*implicit normalization* by dividing by the sum of squared distances.
 
-In McGee's elastic method the loss is constructed to satisfy two requirements. The first one is
+In McGee's elastic method the loss is constructed to satisfy two requirements.
+The first one is
 
-> Psychological judgments which indicated relatively great separation of stimuli should be allowed greater error than judgments indicating close proximity (l.c. p. 182)
+> Psychological judgments which indicated relatively great separation of stimuli
+> should be allowed greater error than judgments indicating close proximity
+> (l.c. p. 182)
 
-And the second requirement is the basic MDS requirement that dimensionality of $X$ must as low as possible, while still providing a good fit.
+And the second requirement is the basic MDS requirement that dimensionality of
+$X$ must as low as possible, while still providing a good fit.
 
-> A criterion which suggested itself in response to the first requirement was one based on the physical work done on an elastic spring to stretch or compress it from an initial length $\delta_{ij}$ to a final length $d_{ij}$. (l.c. p. 183)
+> A criterion which suggested itself in response to the first requirement was
+> one based on the physical work done on an elastic spring to stretch or
+> compress it from an initial length $\delta_{ij}$ to a final length $d_{ij}$.
+> (l.c. p. 183)
 
-This leads to the loss function 
+This leads to the loss function
 \begin{equation}
-\sigma(X,\Delta):=\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}\frac{(\delta_{ij}-d_{ij}(X))^2}{\delta_{ij}^2},\label{eq-mcgee}
+  \sigma(X,\Delta) := \mathop{\sum\sum}_{1 \leq i<j \leq n}w_{ij}\frac{(\delta_{ij} - d_{ij}(X))^2}{\delta_{ij}^2},\label{eq-mcgee}
 \end{equation}
-which McGee calls *work*. We shall just call it *stress* (and *elastic stress* or *McGee stress*), using the more familiar MDS name for loss. We will also continue to use the symbol $\sigma$ for any least squares MDS loss function.
+which McGee calls *work*. We shall just call it *stress* (and *elastic stress*
+or *McGee stress*), using the more familiar MDS name for loss. We will also
+continue to use the symbol $\sigma$ for any least squares MDS loss function.
 
-The elastic MDS problem is minimization of stress
-over both $X$ and $\Delta$, where $\Delta$ must be monotone with the given dissimilarities.
-In \eqref{eq-mcgee} the weight $w_{ij}$ is interpreted as the modulus of elasticity of the spring $(i,j)$.
+The elastic MDS problem is minimization of stress over both $X$ and $\Delta$,
+where $\Delta$ must be monotone with the given dissimilarities. In
+\eqref{eq-mcgee} the weight $w_{ij}$ is interpreted as the modulus of elasticity
+of the spring $(i,j)$.
 
 In @mcgee_67 the alternative loss function
 \begin{equation}
-\sigma(X,\Delta):=\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}\frac{(\delta_{ij}-d_{ij}(X))^2}{d_{ij}^2(X)},\label{eq-mcgee2}
+  \sigma(X,\Delta) := \mathop{\sum\sum}_{1 \leq i<j \leq n}w_{ij}\frac{(\delta_{ij} - d_{ij}(X))^2}{d_{ij}^2(X)},\label{eq-mcgee2}
 \end{equation}
-is proposed. Minimizing \eqref{eq-mcgee2} seems more complicated, and we will postpone 
-studying algorithms to minimize it. Thus we will work with \eqref{eq-mcgee} in this paper.
+is proposed. Minimizing \eqref{eq-mcgee2} seems more complicated, and we will
+postpone studying algorithms to minimize it. Thus we will work with
+\eqref{eq-mcgee} in this paper.
 
-In McGee's papers the actual algorithm and its implementation are not described in sufficient detail. Part of the problem is that he is dealing exclusively with the nonmetric case, in which minimization over both $X$ and $\Delta$ is necessary. In the metric case minimization is over $X$ only, and the algorithm is much simpler.
-
-
+In McGee's papers the actual algorithm and its implementation are not described
+in sufficient detail. Part of the problem is that he is dealing exclusively with
+the nonmetric case, in which minimization over both $X$ and $\Delta$ is
+necessary. In the metric case minimization is over $X$ only, and the algorithm
+is much simpler.
 
 # Properties
 
-If we compare \eqref{eq-kruskal} and \eqref{eq-mcgee} we see one important difference. The normalization in \eqref{eq-kruskal} is by the sum of squared dissimilarities, while the normalization in \eqref{eq-mcgee} is term-by-term, by the squared dissimilarities themselves. An alternative way of writing the elastic loss function makes this more clear.
+If we compare \eqref{eq-kruskal} and \eqref{eq-mcgee} we see one important
+difference. The normalization in \eqref{eq-kruskal} is by the sum of squared
+dissimilarities, while the normalization in \eqref{eq-mcgee} is term-by-term, by
+the squared dissimilarities themselves. An alternative way of writing the
+elastic loss function makes this more clear.
 \begin{equation}
-\sigma(X,\Delta):=\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}\left(1-\frac{d_{ij}(X)}{\delta_{ij}}\right)^2\label{eq-mcgee3}
+  \sigma(X,\Delta) := \mathop{\sum\sum}_{1 \leq i<j \leq n}w_{ij}\left( 1 - \frac{d_{ij}(X)}{\delta_{ij}} \right)^2\label{eq-mcgee3}
 \end{equation}
-Thus we see that instead of minimizing the difference of dissimilarities and distances from zero the elastic method minimizes the deviations of their ratios from one.
+Thus we see that instead of minimizing the difference of dissimilarities and
+distances from zero the elastic method minimizes the deviations of their ratios
+from one.
 
-If $\delta_{ij}$ is multiplied by a positive constant, then so is the optimum configuration $X$ and the $D(X)$. As a consequence, the minimum of elastic stress does not change, i.e. is homogeneous of degree zero in the dissimilarities.
+If $\delta_{ij}$ is multiplied by a positive constant, then so is the optimum
+configuration $X$ and the $D(X)$. As a consequence, the minimum of elastic
+stress does not change, i.e. is homogeneous of degree zero in the
+dissimilarities.
 
-It is clear from \eqref{eq-mcgee3} that the loss function is undefined if one or more of the dissimilarities are zero. If one of the distances is zero, then the corresponding term in the loss function is equal to the corresponding weight, irrespective of what the corresponding dissimilarity is. Thus the minimum of elastic stress is always less than or equal to the sum of the weights, its value at $X=0$.
+It is clear from \eqref{eq-mcgee3} that the loss function is undefined if one or
+more of the dissimilarities are zero. If one of the distances is zero, then the
+corresponding term in the loss function is equal to the corresponding weight,
+irrespective of what the corresponding dissimilarity is. Thus the minimum of
+elastic stress is always less than or equal to the sum of the weights, its value
+at $X = 0$.
 
-If $\delta_{ij}$ and $d_{ij}(X)$ are non-zero and close then a first order Taylor series expansion gives
+If $\delta_{ij}$ and $d_{ij}(X)$ are non-zero and close then a first order
+Taylor series expansion gives
 \begin{equation}
-\log d_{ij}(X)-\log\delta_{ij}\approx\frac{1}{\delta_{ij}}(d_{ij}(X)-\delta_{ij}),\label{eq-ddelta}
+  \log d_{ij}(X) - \log\delta_{ij} \approx \frac{1}{\delta_{ij}}(d_{ij}(X) - \delta_{ij}),\label{eq-ddelta}
 \end{equation}
 from which it follows that
 \begin{equation}
-\sigma(X,\Delta)\approx\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}(\log\delta_{ij}-\log d_{ij}(X))^2.\label{eq-approx}
+  \sigma(X,\Delta) \approx \mathop{\sum\sum}_{1 \leq i<j \leq n}w_{ij}(\log\delta_{ij} - \log d_{ij}(X))^2.\label{eq-approx}
 \end{equation}
-If the fit is good the elastic stress will be approximately equal to the logarithmic stress from @ramsay_77. Or, to put it differently, minimizing elastic stress can serve as an approximation to minimizing logarithmic stress.
+If the fit is good the elastic stress will be approximately equal to the
+logarithmic stress from @ramsay_77. Or, to put it differently, minimizing
+elastic stress can serve as an approximation to minimizing logarithmic stress.
 
 # Algorithm
 
-In this paper we will give an iterative algorithm for minimizing loss from \eqref{eq-mcgee} in the metric and non-metric (ordinal) case. A majorization algorithm for the metric case is already available in
-the smacofx package (@rusch_deleeuw_chen_mair_25, @rusch_deleeuw_mair_hornik_25). Our new non-metric algorithm is in the *alternating least squares* family, which means we alternate minimizing over $X$ for fixed $\Delta$ and over $\Delta$ for fixed 
-$X$.
+In this paper we will give an iterative algorithm for minimizing loss from
+\eqref{eq-mcgee} in the metric and non-metric (ordinal) case. A majorization
+algorithm for the metric case is already available in the smacofx package
+(@rusch_deleeuw_chen_mair_M_25, @rusch_deleeuw_mair_hornik_26). Our new non-metric
+algorithm is in the *alternating least squares* family, which means we alternate
+minimizing over $X$ for fixed $\Delta$ and over $\Delta$ for fixed $X$.
 
-We will start our iterations with the classical metric MDS solution (@torgerson_58) for $\Delta$. We actually
-scale that solution by minimizing
+We will start our iterations with the classical metric MDS solution
+(@torgerson_58) for $\Delta$. We actually scale that solution by minimizing
 \begin{equation}
-\sigma(\lambda):=\sum_{k=1}^m \frac{w_k}{\delta_k^2}(\delta_k-\lambda d_k(X))^2\label{eq-lstress}
+  \sigma(\lambda) := \sum_{k=1}^m \frac{w_k}{\delta_k^2}(\delta_k - \lambda d_k(X))^2\label{eq-lstress}
 \end{equation}
 over $\lambda$. The minimum is attained at
 \begin{equation}
-\hat\lambda:=\frac{\sum_{k=1}^m \frac{w_k}{\delta_k}d_k(X)}{\sum_{k=1}^m \frac{w_k}{\delta_k^2}d_k^2(X)}.\label{eq-lbd}
+  \hat\lambda := \frac{\sum_{k=1}^m \frac{w_k}{\delta_k}d_k(X)}{\sum_{k=1}^m \frac{w_k}{\delta_k^2}d_k^2(X)}.\label{eq-lbd}
 \end{equation}
 
-In iteration $k$ we perform one majorization step to replace $X^{(k)}$ by $X^{(k+1)}$ to improve loss for fixed $\Delta^{(k)}$ and one monotone regression step to replace $\Delta^{(k)}$ by $\Delta^{(k+1)}$ for fixed
-$X^{(k+1)}$. 
+In iteration $k$ we perform one majorization step to replace $X^{(k)}$ by
+$X^{(k+1)}$ to improve loss for fixed $\Delta^{(k)}$ and one monotone regression
+step to replace $\Delta^{(k)}$ by $\Delta^{(k+1)}$ for fixed $X^{(k+1)}$.
 
 To minimize \eqref{eq-mcgee} over $X$ for fixed $\Delta$ we rewrite loss as
 \begin{equation}
-\sigma(X,\Delta)=\mathop{\sum\sum}_{1\leq i<j\leq n}\frac{w_{ij}}{\delta_{ij}^2}(\delta_{ij}-d_{ij}(X))^2.\label{eq-mcgee4}
+  \sigma(X,\Delta) = \mathop{\sum\sum}_{1 \leq i<j \leq n}\frac{w_{ij}}{\delta_{ij}^2}(\delta_{ij} - d_{ij}(X))^2.\label{eq-mcgee4}
 \end{equation}
-This can be minimized (or decreased) by using the standard smacof majorization step with the weights $w_{ij}/\delta_{ij}^2$.
+This can be minimized (or decreased) by using the standard smacof majorization
+step with the weights $w_{ij}/\delta_{ij}^2$.
 
-To minimize over $\Delta$ for given $X$ we define $\gamma_{ij}:=-\delta_{ij}^{-1}$ and $c_{ij}(X):=-d_{ij}^{-1}(X)$.
-Rewrite loss as 
+To minimize over $\Delta$ for given $X$ we define
+$\gamma_{ij} := -\delta_{ij}^{-1}$ and $c_{ij}(X) := -d_{ij}^{-1}(X)$. Rewrite
+loss as
 \begin{equation}
-\sigma(X,\Gamma)=\mathop{\sum\sum}_{1\leq i<j\leq n}w_{ij}d_{ij}^2(X)(\gamma_{ij}-c_{ij}(X))^2,\label{eq-mcgee5}
+  \sigma(X,\Gamma) = \mathop{\sum\sum}_{1 \leq i<j \leq n}w_{ij}d_{ij}^2(X)(\gamma_{ij} - c_{ij}(X))^2,\label{eq-mcgee5}
 \end{equation}
-which we must minimize over increasing $\gamma_{ij}$. This is just monotone regression with  the $c_{ij}(X)$ as the targets and with weights $w_{ij}d_{ij}^2(X)$. After we have found the optimal $\hat\gamma_{ij}$ we transform
-back to $\hat\delta_{ij}=-\hat\gamma_{ij}^{-1}$.
-
-
+which we must minimize over increasing $\gamma_{ij}$. This is just monotone
+regression with the $c_{ij}(X)$ as the targets and with weights
+$w_{ij}d_{ij}^2(X)$. After we have found the optimal $\hat\gamma_{ij}$ we
+transform back to $\hat\delta_{ij} = -\hat\gamma_{ij}^{-1}$.
 
 # Software
 
-The github repository contains R and C versions of the smacofSSElastic program. 
-Both smacofSSElasticC() and smacofSSElasticR() have the same default values of the 
-parameters and the two programs are structured the same way. We iterate a 
-maximum of 1000 iterations until the change in stress from one iteration 
-to the next is less than `r 1e-6`. A single majorization update is alternated
-with a single monotone regression.
+The github repository contains R and C versions of the smacofSSElastic program.
+Both smacofSSElasticC() and smacofSSElasticR() have the same default values of
+the parameters and the two programs are structured the same way. We iterate a
+maximum of 1000 iterations until the change in stress from one iteration to the
+next is less than `r 1e-6`. A single majorization update is alternated with a
+single monotone regression.
 
-smacofSSElasticC() has a driver in R that sets up the MDS data structure (@deleeuw_E_25b). Both
-programsuse a number of R utilities for data manipulation and to compute the initial configuration. One important difference is that the R version uses 
-gpava(), which is written in R, for monotone regression (@deleeuw_hornik_mair_A_09), while the R version uses the C routine monotone() from @busing_22.
+smacofSSElasticC() has a driver in R that sets up the MDS data structure
+(@deleeuw_E_25b). Both programsuse a number of R utilities for data manipulation
+and to compute the initial configuration. One important difference is that the R
+version uses gpava(), which is written in R, for monotone regression
+(@deleeuw_hornik_mair_A_09), while the R version uses the C routine monotone()
+from @busing_22.
 
 # Examples
 
-We analyze two classical MDS examples: the color data of @ekman_54 and the Morse code data of @rothkopf_57. We are only interested in this paper in the properties of the programs, not in the substantive interpretation of the results.
+We analyze two classical MDS examples: the color data of @ekman_54 and the Morse
+code data of @rothkopf_57. We are only interested in this paper in the
+properties of the programs, not in the substantive interpretation of the
+results.
 
 ## Results
 
-```{r ekman, echo = FALSE}
+```{r}
+#| label: ekman
+#| echo: false
+
 source("ekmanData.R")
 hen <- smacofSSElasticC(ekmanData, ordinal = FALSE, verbose = FALSE)
 heo <- smacofSSElasticC(ekmanData, ordinal = TRUE, verbose = FALSE)
 ```
-Numerical elastic scaling takes `r hen$niter` iterations to arrive at stress `r hen$stress`. For ordinal
-we need `r heo$niter` iterations for stress `r heo$stress`. Since the ordinal fit is very good the
-log-stress of \eqref{eq-approx} should be close to the elastic stress. It is `r sum((log(heo$dhat) - log(heo$confdist))^2)`.
+Numerical elastic scaling takes `r hen$niter` iterations to arrive at stress
+`r hen$stress`. For ordinal we need `r heo$niter` iterations for stress
+`r heo$stress`. Since the ordinal fit is very good the log-stress of
+\eqref{eq-approx} should be close to the elastic stress. It is
+`r sum((log(heo$dhat) - log(heo$confdist))^2)`.
 
-```{r morse, echo = FALSE}
+```{r}
+#| label: morse
+#| echo: false
+
 source("morseData.R")
 hmn <- smacofSSElasticC(morseData, ordinal = FALSE, verbose = FALSE)
 hmo <- smacofSSElasticC(morseData, ordinal = TRUE, verbose = FALSE)
 ```
 
-For the Morse code data numerical elastic scaling takes `r hmn$niter` iterations to arrive at stress `r hmn$stress`, for ordinal we need `r hmo$niter` iterations for stress `r hmo$stress`. Because the fit is much worse than
-in the Ekman case we do not expect log-stress to be close to elastic stress. For the ordinal case final log-stress is `r sum((log(hmo$dhat) - log(hmo$confdist))^2)`.
+For the Morse code data numerical elastic scaling takes `r hmn$niter` iterations
+to arrive at stress `r hmn$stress`, for ordinal we need `r hmo$niter` iterations
+for stress `r hmo$stress`. Because the fit is much worse than in the Ekman case
+we do not expect log-stress to be close to elastic stress. For the ordinal case
+final log-stress is `r sum((log(hmo$dhat) - log(hmo$confdist))^2)`.
 
 ## Timing
 
-The results of a comparison of the R and C implementations with microbenchmark (@mersmann_24) yields the
-times in microseconds in following table.
+The results of a comparison of the R and C implementations with microbenchmark
+(@mersmann_24) yields the times in microseconds in following table.
 
-```{r ekmb, cache = TRUE}
+```{r}
+#| label: ekmb
+#| cache: true
+#| echo: false
+#| eval: false
+
 xinit <- smacofTorgerson(ekmanData, ndim = 2)$conf
 microbenchmark(
-  smacofSSSammonR(ekmanData, xinit - xinit, eps = 1e-6, itmax = 1000, ordinal = FALSE, weighted = FALSE, verbose = FALSE),
-  smacofSSSammonC(ekmanData, xinit - xinit, eps = 1e-6, itmax = 1000, ordinal = FALSE, weighted = FALSE, verbose = FALSE),
-  smacofSSSammonR(ekmanData, xinit - xinit, eps = 1e-6, itmax = 1000, ordinal = TRUE, weighted = FALSE, verbose = FALSE),
-  smacofSSSammonC(ekmanData, xinit - xinit, eps = 1e-6, itmax = 1000, ordinal = TRUE, weighted = FALSE, verbose = FALSE))
+  smacofSSElasticR(ekmanData, xinit - xinit, eps = 1e-6, itmax = 1000, ordinal = FALSE, weighted = FALSE, verbose = FALSE),
+  smacofSSElasticC(ekmanData, xinit - xinit, eps = 1e-6, itmax = 1000, ordinal = FALSE, weighted = FALSE, verbose = FALSE),
+  smacofSSElasticR(ekmanData, xinit - xinit, eps = 1e-6, itmax = 1000, ordinal = TRUE, weighted = FALSE, verbose = FALSE),
+  smacofSSElasticC(ekmanData, xinit - xinit, eps = 1e-6, itmax = 1000, ordinal = TRUE, weighted = FALSE, verbose = FALSE))
 ```
 
-```{r microekman, echo = FALSE}
+```{r}
+#| label: microekman
+#| echo: false
+
 a<-matrix(c(40.13, 1.44, 163.52, 4.06, 41.66, 1.53, 168.14, 4.39, 
             44.38, 1.60, 172.10, 4.57, 43.84, 1.60, 169.50, 4.46,
             45.11, 1.64, 172.28, 4.71, 109.41, 1.81, 242.27, 7.37),
@@ -229,12 +315,15 @@ colnames(a) <- c("min", "lq", "mean", "median", "uq", "max")
 row.names(a) <- c("R/Numerical", "C/Numerical", "R/Ordinal", "C/Ordinal")
 a
 ```
-Using median times we see that that C version is about 40 times as fast as the R version.
-
+Using median times we see that that C version is about 40 times as fast as the R
+version.
 
 Next, the timings for the Morse data.
 
-```{r micromorse, echo = FALSE}
+```{r}
+#| label: micromorse
+#| echo: false
+
 a<-matrix(c(80.71, 6.38, 711.81, 7.25,
             85.50, 6.62, 744.80, 7.60,
             92.21, 6.77, 767.76, 7.82, 
@@ -246,21 +335,30 @@ colnames(a) <- c("min", "lq", "mean", "median", "uq", "max")
 row.names(a) <- c("R/Numerical", "C/Numerical", "R/Ordinal", "C/Ordinal")
 a
 ```
-In the numerical case the C version is about 15 times as fast, in the ordinal case
-about 100 times. The huge difference in the ordinal case is likely due in large part to the different monotone regression routines used by the R and C programs.
+In the numerical case the C version is about 15 times as fast, in the ordinal
+case about 100 times. The huge difference in the ordinal case is likely due in
+large part to the different monotone regression routines used by the R and C
+programs.
 
-Of course these microbenchmark results depend on the default
-parameters of the programs (same in R and C), on the speed of my computer
-(Mac Mini with Apple M4 Pro, 64 GB of RAM, Tahoe 26.2, Apple clang 17.0.0), and on my programming habits (same in R and C).
+Of course these microbenchmark results depend on the default parameters of the
+programs (same in R and C), on the speed of my computer (Mac Mini with Apple M4
+Pro, 64 GB of RAM, Tahoe 26.2, Apple clang 17.0.0), and on my programming habits
+(same in R and C).
 
 ## Plots
 
 We use Shepard plots (@deleeuw_mair_C_15) to illustrate the difference between
-the solutions for classical Kruskal stress and elastic stress. Both for
-Ekman and Morse we give the two solutions in the ordinal case, with the primary
+the solutions for classical Kruskal stress and elastic stress. Both for Ekman
+and Morse we give the two solutions in the ordinal case, with the primary
 approach to ties.
 
-```{r compplotE, fig.align = "center", fig.width = 8, fig.height = 8, echo = FALSE}
+```{r}
+#| label: compplotE
+#| fig-align: "center"
+#| fig-width: 8
+#| fig-height: 8
+#| echo: false
+
 par(pty="s")
 setwd("/Users/deleeuw/Desktop/recents/elastic")
 source("smacofSSElasticC.R")
@@ -273,7 +371,13 @@ source("smacofSS.R")
 h2 <- smacofSS(ekmanData, ordinal = TRUE, verbose = FALSE)
 smacofShepardPlot(h2, main = "Shepard Plot Ekman, Kruskal")
 ```
-```{r compplotM, fig.align = "center", fig.width = 8, fig.height = 8, echo = FALSE}
+```{r}
+#| label: compplotM
+#| fig-align: "center"
+#| fig-width: 8
+#| fig-height: 8
+#| echo: false
+
 par(pty="s")
 setwd("/Users/deleeuw/Desktop/recents/elastic")
 source("smacofSSElasticC.R")
@@ -287,9 +391,8 @@ h2 <- smacofSS(morseData, ordinal = TRUE, verbose = FALSE)
 smacofShepardPlot(h2, main = "Shepard Plot Morse, Kruskal")
 ```
 
-The examples show that the solutions are pretty similar, but definitely elastic MDS
-gives a better fit for the smaller dissimilarities and deemphasizes the larger ones.
-In that sense elastic MDS is more "robust".
+The examples show that the solutions are pretty similar, but definitely elastic
+MDS gives a better fit for the smaller dissimilarities and deemphasizes the
+larger ones. In that sense elastic MDS is more "robust".
 
 # References
-
